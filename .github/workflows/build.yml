@@ -3,6 +3,10 @@ name: Build and Release Windows EXE
 on:
   push:
     branches: [ "main" ]
+    # با اضافه کردن بخش زیر، ورک‌فلو فقط با تغییر این دو فایل اجرا می‌شود
+    paths:
+      - 'deploy.py'
+      - 'zeus.js'
   workflow_dispatch:
 
 jobs:
