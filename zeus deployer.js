@@ -268,9 +268,9 @@ function getHtmlContent() {
             #error-box {
                 padding: 12px;
                 background: rgba(255, 95, 86, 0.1);
-                border: 4px solid #990800;
+                border: 2px solid #990800;
                 color: #ffe6e6;
-                border-radius: 800px;
+                border-radius: 40px;
                 font-size: 13px;
                 display: none;
                 text-align: center;
@@ -573,28 +573,36 @@ function toggleToken() {
                     errorBox.style.display = 'block';
 
                     const errorMsg = e.message;
+                    const rawError = errorMsg.includes('|') ? errorMsg.split('|')[1] : errorMsg;
                     
-                    if (errorMsg.includes("CF_TOS_ERROR") || errorMsg.includes("CF_DB_ERROR") || errorMsg.includes("CF_DEPLOY_ERROR")) {
-                        let userFriendlyMsg = "حساب کلودفلر شما خام است و نیاز به تایید دارد.";
-                        
-                        if (errorMsg.includes("email") || errorMsg.includes("verify")) {
-                            userFriendlyMsg = "ابتدا باید ایمیل خود را در داشبورد کلودفلر تایید کنید.";
-                        } else {
-                            userFriendlyMsg = "باید قوانین کلودفلر ورکرز را تایید کنید. لطفاً وارد داشبورد شوید.";
-                        }
-
-                        const rawError = errorMsg.split('|')[1] || errorMsg;
-
-                        errorBox.innerHTML = '<div style="margin-bottom: 8px;">' + userFriendlyMsg + '</div>' +
+                    if (errorMsg.includes("databases per account") || errorMsg.includes("limit reached")) {
+                        errorBox.innerHTML = '<div style="margin-bottom: 8px;">شما به سقف مجاز ساخت دیتابیس D1 (۱۰ عدد) رسیده‌اید. لطفاً وارد بخش Storage & Databases شده و یکی از دیتابیس‌های قبلی را حذف کنید.</div>' +
                             '<div style="font-size: 11px; opacity: 0.7; margin-bottom: 12px; direction: ltr; word-wrap: break-word;">' + rawError + '</div>' +
-                            '<a href="https://dash.cloudflare.com/?to=/:account/workers/overview" target="_blank" style="display: inline-block; background: #ff5f56; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 12px;">ورود به کلودفلر برای تایید</a>';
+                            '<a href="https://dash.cloudflare.com/?to=/:account/workers/d1" target="_blank" style="display: inline-block; background: #ff5f56; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 12px;">مدیریت دیتابیس‌های D1</a>';
+                    }
+                    else if (errorMsg.includes("script limit") || errorMsg.includes("scripts per account")) {
+                        errorBox.innerHTML = '<div style="margin-bottom: 8px;">شما به سقف مجاز ساخت ورکر (۱۰۰ عدد) رسیده‌اید. لطفاً یکی از ورکرهای قبلی خود را حذف کنید.</div>' +
+                            '<div style="font-size: 11px; opacity: 0.7; margin-bottom: 12px; direction: ltr; word-wrap: break-word;">' + rawError + '</div>' +
+                            '<a href="https://dash.cloudflare.com/?to=/:account/workers/services" target="_blank" style="display: inline-block; background: #ff5f56; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 12px;">مدیریت ورکرها</a>';
+                    }
+                    else if (errorMsg.includes("اکانتی یافت نشد") || errorMsg.includes("Authentication") || errorMsg.includes("Invalid")) {
+                        errorBox.innerHTML = '<div style="margin-bottom: 8px;">توکن وارد شده نامعتبر است یا دسترسی‌های لازم را ندارد. لطفاً توکن جدیدی ایجاد کنید.</div>' +
+                            '<div style="font-size: 11px; opacity: 0.7; margin-bottom: 12px; direction: ltr; word-wrap: break-word;">' + rawError + '</div>' +
+                            '<a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" style="display: inline-block; background: #ff5f56; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 12px;">مدیریت توکن‌ها</a>';
+                    }
+                    else if (errorMsg.includes("CF_TOS_ERROR") || errorMsg.includes("CF_DB_ERROR") || errorMsg.includes("CF_DEPLOY_ERROR")) {
+                        if (errorMsg.includes("email") || errorMsg.includes("verify")) {
+                            errorBox.innerHTML = '<div style="margin-bottom: 8px;">ابتدا باید آدرس ایمیل خود را در تنظیمات کلودفلر تایید (Verify) کنید.</div>' +
+                                '<div style="font-size: 11px; opacity: 0.7; margin-bottom: 12px; direction: ltr; word-wrap: break-word;">' + rawError + '</div>' +
+                                '<a href="https://dash.cloudflare.com/profile" target="_blank" style="display: inline-block; background: #ff5f56; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 12px;">تایید ایمیل در پروفایل</a>';
+                        } else {
+                            errorBox.innerHTML = '<div style="margin-bottom: 8px;">باید قوانین کلودفلر ورکرز را تایید کنید. لطفاً وارد داشبورد شوید.</div>' +
+                                '<div style="font-size: 11px; opacity: 0.7; margin-bottom: 12px; direction: ltr; word-wrap: break-word;">' + rawError + '</div>' +
+                                '<a href="https://dash.cloudflare.com/?to=/:account/workers/overview" target="_blank" style="display: inline-block; background: #ff5f56; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 12px;">ورود به کلودفلر</a>';
+                        }
                     } else {
                         errorBox.innerText = errorMsg;
                     }
-                } finally {
-                    btn.disabled = false;
-                    document.getElementById('apiToken').disabled = false;
-                    btn.innerText = 'ساخت پنل';
                 }
             }
         </script>
