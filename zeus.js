@@ -7,6 +7,7 @@ const GLOBAL_TRAFFIC_CACHE = new Map();
 const ACTIVE_CONNECTIONS_COUNT = new Map();
 const GLOBAL_LAST_ACTIVE_WRITE = new Map();
 const GLOBAL_LAST_DB_WRITE = new Map();
+const GLOBAL_WRITE_LOCK = new Map();
 const DNS_CACHE = new Map();
 
 // ==========================================================
@@ -707,16 +708,22 @@ async function flushExpiredTraffic(env) {
   const now = Date.now();
   for (const [uname, cachedBytes] of GLOBAL_TRAFFIC_CACHE.entries()) {
     if (cachedBytes <= 0) continue;
+    
+    if (GLOBAL_WRITE_LOCK.get(uname)) continue;
+
     const lastActive = GLOBAL_LAST_ACTIVE_WRITE.get(uname) || 0;
     const activeCount = ACTIVE_CONNECTIONS_COUNT.get(uname) || 0;
+    
     if (activeCount <= 0 || (now - lastActive > 65000)) {
+      GLOBAL_WRITE_LOCK.set(uname, true);
       GLOBAL_TRAFFIC_CACHE.set(uname, 0);
+      
       const deltaGb = cachedBytes / (1024 * 1024 * 1024);
       try {
         await env.DB.prepare("UPDATE users SET used_gb = used_gb + ? WHERE username = ?").bind(deltaGb, uname).run();
       } catch (e) {
-        let recovered = GLOBAL_TRAFFIC_CACHE.get(uname) || 0;
-        GLOBAL_TRAFFIC_CACHE.set(uname, recovered + cachedBytes);
+      } finally {
+        GLOBAL_WRITE_LOCK.set(uname, false);
       }
     }
   }
@@ -739,13 +746,20 @@ async function handleVLESS(env, storedData = null, ctx = null) {
     GLOBAL_TRAFFIC_CACHE.set(username, current + bytes);
     GLOBAL_LAST_ACTIVE_WRITE.set(username, Date.now());
 
+    if (GLOBAL_WRITE_LOCK.get(username)) return;
+
     let lastDbWrite = GLOBAL_LAST_DB_WRITE.get(username) || 0;
     let now = Date.now();
     let thresholdBytes = 10 * 1024 * 1024;
 
     if (current >= thresholdBytes || (current > 0 && now - lastDbWrite > 60000)) {
+        GLOBAL_WRITE_LOCK.set(username, true);
         let toCommit = GLOBAL_TRAFFIC_CACHE.get(username) || 0;
-        if (toCommit <= 0) return;
+        
+        if (toCommit <= 0) {
+            GLOBAL_WRITE_LOCK.set(username, false);
+            return;
+        }
 
         GLOBAL_TRAFFIC_CACHE.set(username, 0);
         GLOBAL_LAST_DB_WRITE.set(username, now);
@@ -756,9 +770,8 @@ async function handleVLESS(env, storedData = null, ctx = null) {
             try {
                 await env.DB.prepare("UPDATE users SET used_gb = used_gb + ? WHERE username = ?").bind(deltaGb, username).run();
             } catch (e) {
-                let recovered = GLOBAL_TRAFFIC_CACHE.get(username) || 0;
-                GLOBAL_TRAFFIC_CACHE.set(username, recovered + toCommit);
-                GLOBAL_LAST_DB_WRITE.set(username, 0);
+            } finally {
+                GLOBAL_WRITE_LOCK.set(username, false);
             }
         };
 
@@ -781,16 +794,19 @@ async function handleVLESS(env, storedData = null, ctx = null) {
     if (activeCount <= 0) {
       ACTIVE_CONNECTIONS_COUNT.delete(uname);
       let cachedBytes = GLOBAL_TRAFFIC_CACHE.get(uname) || 0;
-      if (cachedBytes > 0) {
+      
+      if (cachedBytes > 0 && !GLOBAL_WRITE_LOCK.get(uname)) {
+        GLOBAL_WRITE_LOCK.set(uname, true);
         GLOBAL_TRAFFIC_CACHE.set(uname, 0);
+        
         const deltaGb = cachedBytes / (1024 * 1024 * 1024);
         
         const writeTask = async () => {
           try {
             await env.DB.prepare("UPDATE users SET used_gb = used_gb + ? WHERE username = ?").bind(deltaGb, uname).run();
           } catch (e) {
-            let recovered = GLOBAL_TRAFFIC_CACHE.get(uname) || 0;
-            GLOBAL_TRAFFIC_CACHE.set(uname, recovered + cachedBytes);
+          } finally {
+            GLOBAL_WRITE_LOCK.set(uname, false);
           }
         };
         
@@ -1952,7 +1968,7 @@ const HTML_TEMPLATES = {
             <div class="flex flex-col sm:flex-row sm:items-center gap-3">
                 <h1 class="text-lg font-bold flex items-center gap-2" dir="ltr">
                     ZEUS Panel 
-                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.2.5</span>
+                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.2.6</span>
                 </h1>
                 <div class="flex items-center gap-3 bg-gray-100 dark:bg-zinc-800/60 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800/80 shadow-sm flex-shrink-0 w-fit">
                     <a href="https://github.com/IR-NETLIFY/zeus" target="_blank" rel="noopener noreferrer" class="text-gray-700 dark:text-zinc-300 hover:text-black dark:hover:text-white transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="گیت‌هاب">
@@ -3245,7 +3261,7 @@ const HTML_TEMPLATES = {
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.2.5';
+const CURRENT_VERSION = '1.2.6';
 
 		async function checkForUpdates(isManual = false) {
             try {
