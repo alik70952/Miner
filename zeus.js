@@ -61,7 +61,7 @@ const Router = {
 				}
 			} catch (e) {}
 			const mockStoredData = { proxy_ip: proxyIP };
-			return handleVLESS(env, mockStoredData, ctx);
+			return handleVLESS(env, mockStoredData, ctx, request);
 		} catch (e) {
 			return new Response("Internal Server Error", { status: 500 });
 		}
@@ -122,8 +122,8 @@ const Router = {
 				limit_req: user.limit_req,
 				used_req: user.used_req,
 				is_active: user.is_active,
-				online_count: ACTIVE_CONNECTIONS_COUNT.get(user.username) || 0,
-				max_connections: user.max_connections,
+				online_count: getActiveIpCount(user.active_ips),
+				ip_limit: user.ip_limit,
 				created_at: user.created_at,
 				tls: user.tls,
 				port: user.port,
@@ -337,7 +337,7 @@ const Router = {
 						}
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					} else {
-						const { username: new_username, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, max_connections } = body;
+						const { username: new_username, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit } = body;
 						if (new_username && new_username !== username) {
 							const existing = await env.DB.prepare("SELECT id FROM users WHERE username = ?").bind(new_username).first();
 							if (existing) {
@@ -360,8 +360,8 @@ const Router = {
 								GLOBAL_LAST_ACTIVE_WRITE.delete(username);
 							}
 						}
-						await env.DB.prepare("UPDATE users SET username = ?, limit_gb = ?, expiry_days = ?, limit_req = ?, ips = ?, tls = ?, port = ?, fingerprint = ?, max_connections = ? WHERE username = ?")
-							.bind(new_username || username, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, tls, port, fingerprint || "chrome", max_connections ? parseInt(max_connections) : null, username)
+						await env.DB.prepare("UPDATE users SET username = ?, limit_gb = ?, expiry_days = ?, limit_req = ?, ips = ?, tls = ?, port = ?, fingerprint = ?, max_connections = ?, ip_limit = ? WHERE username = ?")
+							.bind(new_username || username, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, username)
 							.run();
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					}
@@ -379,8 +379,8 @@ const Router = {
 					const now = Date.now();
 					const enrichedUsers = (results || []).map((user) => ({
 						...user,
-						is_online: user.last_active && now - user.last_active < 65000 ? 1 : 0,
-						online_count: ACTIVE_CONNECTIONS_COUNT.get(user.username) || 0,
+						is_online: user.last_active && now - user.last_active < 25000 ? 1 : 0,
+						online_count: getActiveIpCount(user.active_ips),
 					}));
 					let cfReqs = { today: 0, total: 0 };
 					try {
@@ -422,7 +422,7 @@ const Router = {
 					);
 				}
 				if (request.method === "POST") {
-					const { username, uuid, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, max_connections, used_gb, used_req, created_at, is_active } = await request.json();
+					const { username, uuid, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit, used_gb, used_req, created_at, is_active } = await request.json();
 					if (!username) {
 						return new Response(JSON.stringify({ error: "نام کاربری اجباری است" }), { status: 400, headers: { "Content-Type": "application/json" } });
 					}
@@ -435,8 +435,8 @@ const Router = {
 					const parsedIsActive = parseInt(is_active);
 					const finalIsActive = !isNaN(parsedIsActive) ? parsedIsActive : 1;
 					try {
-						await env.DB.prepare("INSERT INTO users (username, uuid, limit_gb, expiry_days, limit_req, ips, connection_type, tls, port, fingerprint, max_connections, used_gb, used_req, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-							.bind(username, finalUuid, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, atob("dmxlc3M="), tls, port, fingerprint || "chrome", max_connections ? parseInt(max_connections) : null, finalUsedGb, finalUsedReq, finalCreatedAt, finalIsActive)
+						await env.DB.prepare("INSERT INTO users (username, uuid, limit_gb, expiry_days, limit_req, ips, connection_type, tls, port, fingerprint, max_connections, ip_limit, used_gb, used_req, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+							.bind(username, finalUuid, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, atob("dmxlc3M="), tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, finalUsedGb, finalUsedReq, finalCreatedAt, finalIsActive)
 							.run();
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					} catch (err) {
@@ -495,6 +495,15 @@ const DbService = {
 			await db.prepare("ALTER TABLE users ADD COLUMN used_req INTEGER DEFAULT 0").run();
 		} catch (e) {}
 		try {
+			await db.prepare("ALTER TABLE users ADD COLUMN ip_limit INTEGER DEFAULT NULL").run();
+		} catch (e) {}
+		try {
+			await db.prepare("ALTER TABLE users ADD COLUMN active_ips TEXT DEFAULT NULL").run();
+		} catch (e) {}
+		try {
+			await db.prepare("UPDATE users SET ip_limit = max_connections WHERE ip_limit IS NULL AND max_connections IS NOT NULL").run();
+		} catch (e) {}
+		try {
 			await db.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)").run();
 		} catch (e) {}
 		schemaEnsured = true;
@@ -529,6 +538,23 @@ const DbService = {
 		return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 	},
 };
+function getActiveIpCount(activeIpsJson) {
+	if (!activeIpsJson) return 0;
+	try {
+		const activeIps = JSON.parse(activeIpsJson);
+		const now = Date.now();
+		let count = 0;
+		for (const [ip, data] of Object.entries(activeIps)) {
+			const lastSeen = (data && typeof data === 'object') ? data.timestamp : data;
+			if (now - lastSeen <= 30000) {
+				count++;
+			}
+		}
+		return count;
+	} catch (e) {
+		return 0;
+	}
+}
 const SubscriptionService = {
 	async generateText(user, host) {
 		let ips = [host];
@@ -604,7 +630,7 @@ async function flushExpiredTraffic(env) {
 		if (GLOBAL_WRITE_LOCK.get(uname)) continue;
 		const lastActive = GLOBAL_LAST_ACTIVE_WRITE.get(uname) || 0;
 		const activeCount = ACTIVE_CONNECTIONS_COUNT.get(uname) || 0;
-		if (activeCount <= 0 || now - lastActive > 65000) {
+		if (activeCount <= 0 || now - lastActive > 25000) {
 			GLOBAL_WRITE_LOCK.set(uname, true);
 			const deltaGb = cachedBytes / (1024 * 1024 * 1024);
 			try {
@@ -620,7 +646,8 @@ async function flushExpiredTraffic(env) {
 		}
 	}
 }
-async function handleVLESS(env, storedData = null, ctx = null) {
+async function handleVLESS(env, storedData = null, ctx = null, request = null) {
+	const clientIP = request ? (request.headers.get("CF-Connecting-IP") || "unknown") : "unknown";
 	const socketPair = new WebSocketPair();
 	const [clientSock, serverSock] = Object.values(socketPair);
 	serverSock.accept();
@@ -628,6 +655,7 @@ async function handleVLESS(env, storedData = null, ctx = null) {
 	let username = null;
 	let tickCount = 0;
 	let validUUID = null;
+	let userIpLimit = null;
 	function addBytes(bytes) {
 		if (bytes <= 0) return;
 		if (!username) {
@@ -676,6 +704,38 @@ async function handleVLESS(env, storedData = null, ctx = null) {
 		isOfflineSet = true;
 		const uname = username;
 		if (!uname) return;
+
+		if (clientIP && clientIP !== "unknown" && validUUID) {
+			const removeIpTask = async () => {
+				try {
+					const user = await env.DB.prepare("SELECT active_ips FROM users WHERE uuid = ?").bind(validUUID).first();
+					if (user) {
+						console.log(`[setOffline Task] DB active_ips for ${uname}: ${user.active_ips}`);
+						let activeIps = JSON.parse(user.active_ips || '{}');
+						if (activeIps[clientIP]) {
+							if (typeof activeIps[clientIP] === 'object') {
+								activeIps[clientIP].count = (activeIps[clientIP].count || 1) - 1;
+								if (activeIps[clientIP].count <= 0) {
+									delete activeIps[clientIP];
+								}
+							} else {
+								delete activeIps[clientIP];
+							}
+							await env.DB.prepare("UPDATE users SET active_ips = ? WHERE uuid = ?")
+								.bind(JSON.stringify(activeIps), validUUID).run();
+							console.log(`[setOffline Task] Updated active_ips in DB to: ${JSON.stringify(activeIps)}`);
+						} else {
+							console.log(`[setOffline Task] IP ${clientIP} not found in user's active_ips`);
+						}
+					}
+				} catch (e) {
+					console.error(`[setOffline Task] Error: ${e.message}`);
+				}
+			};
+			if (ctx) ctx.waitUntil(removeIpTask());
+			else removeIpTask();
+		}
+
 		let activeCount = ACTIVE_CONNECTIONS_COUNT.get(uname) || 1;
 		activeCount = activeCount - 1;
 		if (activeCount <= 0) {
@@ -720,8 +780,13 @@ async function handleVLESS(env, storedData = null, ctx = null) {
 				tickCount++;
 				if (tickCount >= 1) {
 					tickCount = 0;
-					const user = await env.DB.prepare("SELECT is_active, limit_gb, used_gb, limit_req, used_req, expiry_days, created_at FROM users WHERE uuid = ?").bind(validUUID).first();
+					const user = await env.DB.prepare("SELECT is_active, limit_gb, used_gb, limit_req, used_req, expiry_days, created_at, ip_limit, active_ips FROM users WHERE uuid = ?").bind(validUUID).first();
+					if (user) {
+						userIpLimit = user.ip_limit;
+					}
 					let isExpired = false;
+					let isIpLimitExpired = false;
+					let updatedActiveIps = null;
 					if (!user || user.is_active === 0) {
 						isExpired = true;
 					} else {
@@ -738,6 +803,48 @@ async function handleVLESS(env, storedData = null, ctx = null) {
 								isExpired = true;
 							}
 						}
+
+						// Heartbeat IP Limit enforcement (Database-Backed)
+						if (!isExpired && clientIP && clientIP !== "unknown") {
+							let activeIps = {};
+							try {
+								activeIps = JSON.parse(user.active_ips || '{}');
+							} catch (e) {}
+
+							// Clean up expired (no activity for 30 seconds)
+							const nowTime = Date.now();
+							let hasChanges = false;
+							for (const [ip, data] of Object.entries(activeIps)) {
+								const lastSeen = (data && typeof data === 'object') ? data.timestamp : data;
+								if (nowTime - lastSeen > 30000) {
+									delete activeIps[ip];
+									hasChanges = true;
+								}
+							}
+
+							// If our own IP was deleted, it means we haven't sent keepalives for 30 seconds.
+							// So we are inactive/dead.
+							if (!activeIps[clientIP]) {
+								isIpLimitExpired = true;
+								console.log(`[Heartbeat] IP ${clientIP} expired from active_ips due to inactivity.`);
+							} else {
+								const sortedIps = Object.keys(activeIps).sort((a, b) => {
+									const tA = (activeIps[a] && typeof activeIps[a] === 'object') ? activeIps[a].timestamp : activeIps[a];
+									const tB = (activeIps[b] && typeof activeIps[b] === 'object') ? activeIps[b].timestamp : activeIps[b];
+									return tB - tA;
+								});
+
+								const clientIpIndex = sortedIps.indexOf(clientIP);
+								if (user.ip_limit && user.ip_limit > 0 && clientIpIndex >= user.ip_limit) {
+									isIpLimitExpired = true;
+									console.log(`[Heartbeat] IP Limit Exceeded. Client IP index ${clientIpIndex} >= limit ${user.ip_limit}.`);
+								}
+							}
+
+							if (hasChanges || isIpLimitExpired) {
+								updatedActiveIps = JSON.stringify(activeIps);
+							}
+						}
 					}
 					if (isExpired) {
 						await env.DB.prepare("UPDATE users SET is_active = 0, last_active = 0 WHERE uuid = ?").bind(validUUID).run();
@@ -745,11 +852,21 @@ async function handleVLESS(env, storedData = null, ctx = null) {
 						closeSocketQuietly(serverSock);
 						return;
 					}
+					if (isIpLimitExpired) {
+						console.log(`[Heartbeat] Terminating socket for user ${username}.`);
+						clearInterval(heartbeat);
+						closeSocketQuietly(serverSock);
+						return;
+					}
 					const now = Date.now();
 					const lastRecorded = GLOBAL_LAST_ACTIVE_WRITE.get(username) || 0;
-					if (now - lastRecorded > 15000) {
+					if (now - lastRecorded > 15000 || updatedActiveIps !== null) {
 						GLOBAL_LAST_ACTIVE_WRITE.set(username, now);
-						await env.DB.prepare("UPDATE users SET last_active = ? WHERE username = ?").bind(now, username).run();
+						if (updatedActiveIps !== null) {
+							await env.DB.prepare("UPDATE users SET last_active = ?, active_ips = ? WHERE username = ?").bind(now, updatedActiveIps, username).run();
+						} else {
+							await env.DB.prepare("UPDATE users SET last_active = ? WHERE username = ?").bind(now, username).run();
+						}
 					}
 				}
 			} catch (e) {}
@@ -859,16 +976,63 @@ async function handleVLESS(env, storedData = null, ctx = null) {
 					return;
 				}
 			}
+			userIpLimit = user.ip_limit;
+
+			// Check IP Limit (Database-Backed)
+			if (clientIP && clientIP !== "unknown") {
+				console.log(`[VLESS Handshake] User: ${user.username}, clientIP: ${clientIP}, active_ips in DB: ${user.active_ips}`);
+				let activeIps = {};
+				try {
+					activeIps = JSON.parse(user.active_ips || '{}');
+				} catch (e) {}
+
+				// Clean up expired IPs (no activity for 30 seconds)
+				const now = Date.now();
+				for (const [ip, data] of Object.entries(activeIps)) {
+					const lastSeen = (data && typeof data === 'object') ? data.timestamp : data;
+					if (now - lastSeen > 30000) {
+						delete activeIps[ip];
+					}
+				}
+
+				if (!activeIps[clientIP]) {
+					const sortedIps = Object.keys(activeIps).sort((a, b) => {
+						const tA = (activeIps[a] && typeof activeIps[a] === 'object') ? activeIps[a].timestamp : activeIps[a];
+						const tB = (activeIps[b] && typeof activeIps[b] === 'object') ? activeIps[b].timestamp : activeIps[b];
+						return tB - tA;
+					});
+					console.log(`[VLESS Handshake] Non-expired active IPs: ${JSON.stringify(activeIps)}, count: ${sortedIps.length}, limit: ${user.ip_limit}`);
+					if (user.ip_limit && user.ip_limit > 0 && sortedIps.length >= user.ip_limit) {
+						console.log(`[VLESS Handshake] BLOCKED user ${user.username} because sortedIps.length (${sortedIps.length}) >= limit (${user.ip_limit})`);
+						serverSock.close();
+						return;
+					}
+					activeIps[clientIP] = { timestamp: now, count: 1 };
+				} else {
+					if (typeof activeIps[clientIP] === 'object') {
+						activeIps[clientIP].timestamp = now;
+						activeIps[clientIP].count = (activeIps[clientIP].count || 0) + 1;
+					} else {
+						activeIps[clientIP] = { timestamp: now, count: 1 };
+					}
+					console.log(`[VLESS Handshake] Reconnected from same IP: ${clientIP}, count: ${activeIps[clientIP].count}`);
+				}
+
+				try {
+					await env.DB.prepare("UPDATE users SET active_ips = ?, last_active = ? WHERE uuid = ?")
+						.bind(JSON.stringify(activeIps), now, reqUUID).run();
+					console.log(`[VLESS Handshake] Successfully updated active_ips to: ${JSON.stringify(activeIps)}`);
+				} catch (e) {
+					console.error(`[VLESS Handshake] DB Update Error: ${e.message}`);
+				}
+			}
+
 			validUUID = reqUUID;
 			username = user.username;
 			isHeaderParsed = true;
 			let currentReqs = USER_REQ_CACHE.get(username) || 0;
 			USER_REQ_CACHE.set(username, currentReqs + 1);
 			let activeCount = ACTIVE_CONNECTIONS_COUNT.get(username) || 0;
-			if (user.max_connections && user.max_connections > 0 && activeCount >= user.max_connections) {
-				serverSock.close();
-				return;
-			}
 			ACTIVE_CONNECTIONS_COUNT.set(username, activeCount + 1);
 			if (activeCount === 0) {
 				const setOnlineTask = async () => {
@@ -2138,12 +2302,12 @@ const HTML_TEMPLATES = {
                             </div>
                         </div>
                         <div>
-                            <label class="block text-[10px] sm:text-xs font-bold text-gray-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">کاربر همزمان</label>
+                            <label class="block text-[10px] sm:text-xs font-bold text-gray-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">دستگاه همزمان (IP Limit)</label>
                             <div class="relative">
                                 <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-gray-400">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                 </span>
-                                <input type="number" id="input-max-connections" min="0" placeholder="نامحدود" class="w-full pl-3 pr-10 py-2.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm font-semibold text-gray-800 dark:text-zinc-100 placeholder-gray-400/80 transition">
+                                <input type="number" id="input-ip-limit" min="0" placeholder="نامحدود" class="w-full pl-3 pr-10 py-2.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm font-semibold text-gray-800 dark:text-zinc-100 placeholder-gray-400/80 transition">
                             </div>
                         </div>
                     </div>
@@ -2416,15 +2580,15 @@ const HTML_TEMPLATES = {
                             <input type="number" id="bulk-input-req-limit" min="0" placeholder="بدون تغییر" class="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm font-semibold text-gray-800 dark:text-zinc-100 placeholder-gray-400/80 transition">
                         </div>
                     </div>
-                    <!-- Max Connections -->
+                    <!-- IP Limit -->
                     <div class="flex items-center gap-3 border border-gray-100 dark:border-zinc-900 p-3 rounded-xl bg-gray-50/20 dark:bg-zinc-900/10">
                         <label class="relative inline-flex items-center cursor-pointer select-none">
-                            <input type="checkbox" id="bulk-apply-max-connections" class="sr-only peer">
+                            <input type="checkbox" id="bulk-apply-ip-limit" class="sr-only peer">
                             <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                         </label>
                         <div class="flex-1">
-                            <label class="block text-xs font-bold text-gray-500 dark:text-zinc-400 mb-1 uppercase tracking-wider">کاربر همزمان</label>
-                            <input type="number" id="bulk-input-max-connections" min="0" placeholder="بدون تغییر" class="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm font-semibold text-gray-800 dark:text-zinc-100 placeholder-gray-400/80 transition">
+                            <label class="block text-xs font-bold text-gray-500 dark:text-zinc-400 mb-1 uppercase tracking-wider">دستگاه همزمان (IP Limit)</label>
+                            <input type="number" id="bulk-input-ip-limit" min="0" placeholder="بدون تغییر" class="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm font-semibold text-gray-800 dark:text-zinc-100 placeholder-gray-400/80 transition">
                         </div>
                     </div>
                     <!-- Fingerprint -->
@@ -2655,8 +2819,8 @@ const HTML_TEMPLATES = {
             const expiryValue = document.getElementById('bulk-input-expiry').value || null;
             const applyReqLimit = document.getElementById('bulk-apply-req-limit').checked;
             const reqLimitValue = document.getElementById('bulk-input-req-limit').value || null;
-            const applyMaxConnections = document.getElementById('bulk-apply-max-connections').checked;
-            const maxConnectionsValue = document.getElementById('bulk-input-max-connections').value || null;
+            const applyIpLimit = document.getElementById('bulk-apply-ip-limit').checked;
+            const ipLimitValue = document.getElementById('bulk-input-ip-limit').value || null;
             const applyFingerprint = document.getElementById('bulk-apply-fingerprint').checked;
             const fingerprintValue = document.getElementById('bulk-fingerprint-select').value;
             const applyPorts = document.getElementById('bulk-apply-ports').checked;
@@ -2665,7 +2829,7 @@ const HTML_TEMPLATES = {
             const tlsValue = checkedPorts.some(p => tlsPorts.includes(p)) ? 'on' : 'off';
             const applyIps = document.getElementById('bulk-apply-ips').checked;
             const ipsValue = document.getElementById('bulk-input-ips').value;
-            if (!applyLimit && !applyExpiry && !applyReqLimit && !applyMaxConnections && !applyFingerprint && !applyPorts && !applyIps) {
+            if (!applyLimit && !applyExpiry && !applyReqLimit && !applyIpLimit && !applyFingerprint && !applyPorts && !applyIps) {
                 alert('⚠️ لطفا حداقل یک فیلد را برای اعمال تغییر انتخاب کنید!');
                 submitButton.disabled = false;
                 submitButton.innerText = 'ثبت تغییرات گروهی';
@@ -2679,7 +2843,7 @@ const HTML_TEMPLATES = {
                     const limit = applyLimit ? limitValue : user.limit_gb;
                     const expiry = applyExpiry ? expiryValue : user.expiry_days;
                     const reqLimit = applyReqLimit ? reqLimitValue : user.limit_req;
-                    const maxConnections = applyMaxConnections ? maxConnectionsValue : user.max_connections;
+                    const ipLimit = applyIpLimit ? ipLimitValue : user.ip_limit;
                     const fingerprint = applyFingerprint ? fingerprintValue : user.fingerprint;
                     const port = applyPorts ? portsValue : user.port;
                     const tls = applyPorts ? tlsValue : user.tls;
@@ -2697,7 +2861,7 @@ const HTML_TEMPLATES = {
                                 port,
                                 ips,
                                 fingerprint,
-                                max_connections: maxConnections
+                                ip_limit: ipLimit
                             })
                         });
                         if (response.ok) {
@@ -3092,9 +3256,10 @@ const HTML_TEMPLATES = {
 					    '</div>';
 					}
 					const onlineCount = user.online_count || 0;
+					const limit = user.ip_limit !== undefined ? user.ip_limit : user.max_connections;
 					let onlineHtml = '';
-					if (user.max_connections) {
-					    const onlinePercent = Math.min((onlineCount / user.max_connections) * 100, 100);
+					if (limit) {
+					    const onlinePercent = Math.min((onlineCount / limit) * 100, 100);
 					    const onlineHue = 120 - (onlinePercent * 1.2);
 					    onlineHtml = '<div class="flex flex-row items-center gap-2 w-full min-w-[90px] select-none">' +
 					        '<div class="w-2 h-20 bg-gray-200 dark:bg-zinc-700 rounded-full flex flex-col justify-end overflow-hidden flex-shrink-0">' +
@@ -3102,7 +3267,7 @@ const HTML_TEMPLATES = {
 					        '</div>' +
 					        '<div class="flex flex-col justify-between h-20 text-[10px] text-gray-500 dark:text-gray-400 font-medium text-right flex-1 whitespace-nowrap">' +
 					            '<span class="text-gray-800 dark:text-zinc-200 leading-none">متصل: ' + onlineCount + '</span>' +
-					            '<span class="leading-none">سقف: ' + user.max_connections + '</span>' +
+					            '<span class="leading-none">سقف: ' + limit + '</span>' +
 					        '</div>' +
 					    '</div>';
 					} else {
@@ -3140,7 +3305,7 @@ const HTML_TEMPLATES = {
                                     '<span class="font-bold text-gray-900 dark:text-zinc-100 text-sm truncate max-w-full">' + user.username + '</span>' +
                                     '<div class="flex gap-1 w-full justify-center text-center">' +
                                         (!isEffectivelyActive ? '<span class="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 rounded-md">غیرفعال</span>' : '<span class="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-md">فعال</span>') +
-                                        (user.is_online === 1 ? '<span class="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500 text-white rounded-md animate-pulse" dir="rtl">● آنلاین (' + (user.online_count || 0) + (user.max_connections ? '/' + user.max_connections : '') + ')</span>' : '<span class="px-1.5 py-0.5 text-[10px] font-medium bg-gray-200 text-gray-600 dark:bg-zinc-800 dark:text-zinc-400 rounded-md">آفلاین</span>') +
+                                        (user.is_online === 1 ? '<span class="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500 text-white rounded-md animate-pulse" dir="rtl">● آنلاین (' + (user.online_count || 0) + (limit ? '/' + limit : '') + ')</span>' : '<span class="px-1.5 py-0.5 text-[10px] font-medium bg-gray-200 text-gray-600 dark:bg-zinc-800 dark:text-zinc-400 rounded-md">آفلاین</span>') +
                                     '</div>' +
                                     '<div class="grid grid-cols-2 gap-1 w-full">' +
                                         '<button onclick="copyConfig(\\'' + encodeURIComponent(user.username) + '\\')" title="کپی کانفیگ" class="p-1.5 flex items-center justify-center bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md transition shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>' +
@@ -3239,7 +3404,7 @@ async function resetUserData(encodedUsername, actionType) {
             const limit = document.getElementById('input-limit').value || null;
             const expiry = document.getElementById('input-expiry').value || null;
             const reqLimit = document.getElementById('input-req-limit').value || null;
-            const maxConnections = document.getElementById('input-max-connections').value || null;
+            const ipLimit = document.getElementById('input-ip-limit').value || null;
             const checkedPorts = Array.from(document.querySelectorAll('input[name="ports"]:checked')).map(cb => cb.value);
             if (checkedPorts.length === 0) {
                 alert('⚠️ لطفا حداقل یک پورت را برای اتصال انتخاب کنید!');
@@ -3257,7 +3422,7 @@ async function resetUserData(encodedUsername, actionType) {
                 const response = await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ username, limit_gb: limit, expiry_days: expiry, limit_req: reqLimit, tls, port, ips, fingerprint, max_connections: maxConnections })
+					body: JSON.stringify({ username, limit_gb: limit, expiry_days: expiry, limit_req: reqLimit, tls, port, ips, fingerprint, ip_limit: ipLimit })
                 });
                 if (response.ok) {
                     toggleModal(false);
@@ -3375,7 +3540,7 @@ function editUser(encodedUsername) {
     document.getElementById('input-limit').value = user.limit_gb || '';
     document.getElementById('input-expiry').value = user.expiry_days || '';
     document.getElementById('input-req-limit').value = user.limit_req || '';
-    document.getElementById('input-max-connections').value = user.max_connections || '';
+    document.getElementById('input-ip-limit').value = user.ip_limit !== undefined ? (user.ip_limit || '') : (user.max_connections || '');
     document.getElementById('input-ips').value = user.ips || '';
     document.getElementById('fingerprint-select').value = user.fingerprint || 'chrome';
     const userPorts = String(user.port || '').split(',').map(p => p.trim());
@@ -3582,7 +3747,7 @@ function editUser(encodedUsername) {
                                             tls: u.tls,
                                             port: u.port,
                                             fingerprint: u.fingerprint,
-                                            max_connections: u.max_connections,
+                                            ip_limit: u.ip_limit !== undefined ? u.ip_limit : u.max_connections,
                                             used_gb: u.used_gb,
                                             used_req: u.used_req,
                                             created_at: u.created_at,
@@ -3607,7 +3772,7 @@ function editUser(encodedUsername) {
                                         tls: u.tls,
                                         port: u.port,
                                         fingerprint: u.fingerprint,
-                                        max_connections: u.max_connections,
+                                        ip_limit: u.ip_limit !== undefined ? u.ip_limit : u.max_connections,
                                         used_gb: u.used_gb,
                                         used_req: u.used_req,
                                         created_at: u.created_at,
@@ -4030,11 +4195,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('DOMContentLoaded', () => {
             const u = window.statusUser;
             if (!u) return;
+            const limit = u.ip_limit !== undefined ? u.ip_limit : u.max_connections;
             document.getElementById('display-username').innerText = u.username;
             const badge = document.getElementById('live-connections-badge');
             badge.classList.remove('hidden');
             if (u.online_count && u.online_count > 0) {
-                document.getElementById('live-connections-text').innerText = u.online_count + (u.max_connections ? '/' + u.max_connections : '') + ' دستگاه متصل';
+                document.getElementById('live-connections-text').innerText = u.online_count + (limit ? '/' + limit : '') + ' دستگاه متصل';
                 badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-full text-xs font-bold shadow-sm';
                 badge.querySelector('span.w-2').className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
             } else {
@@ -4107,11 +4273,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('req-progress').style.backgroundColor = '#10b981';
             }
             const onlineCount = u.online_count || 0;
-            const maxConns = u.max_connections;
             document.getElementById('online-count').innerText = onlineCount;
-            if (maxConns) {
-                document.getElementById('limit-online').innerText = maxConns;
-                const oPct = Math.min((onlineCount / maxConns) * 100, 100);
+            if (limit) {
+                document.getElementById('limit-online').innerText = limit;
+                const oPct = Math.min((onlineCount / limit) * 100, 100);
                 document.getElementById('online-pct').innerText = oPct.toFixed(0) + '٪';
                 document.getElementById('online-progress').style.width = oPct + '%';
                 const oHue = 120 - (oPct * 1.2);
