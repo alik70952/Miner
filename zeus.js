@@ -1886,12 +1886,7 @@ const HTML_TEMPLATES = {
                             <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
                         </svg>
                     </a>
-                    <a href="https://www.youtube.com/@MacanDev" target="_blank" rel="noopener noreferrer" class="text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="YouTube">
-                        <svg class="w-[22px] h-[22px] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .5 6.186C0 8.07 0 12 0 12s0 3.93.5 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.378.505 9.378.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                        </svg>
-                    </a>
-                    <a href="https://t.me/EzAccess1" target="_blank" rel="noopener noreferrer" class="text-sky-500 hover:text-sky-600 dark:hover:text-sky-400 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="Telegram">
+                    <a href="https://t.me/IR_NETLIFY" target="_blank" rel="noopener noreferrer" class="text-sky-500 hover:text-sky-600 dark:hover:text-sky-400 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="Telegram">
                         <svg class="w-[22px] h-[22px] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.94-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.37.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .24z"/>
                         </svg>
@@ -2244,14 +2239,14 @@ const HTML_TEMPLATES = {
     </div>
 </div>
     <div id="settings-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 ease-out">
-        <div class="w-full max-w-md bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-2xl shadow-xl overflow-hidden transition-all transform duration-300 opacity-0 scale-95 ease-out">
+        <div class="w-full max-w-md bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-2xl shadow-xl overflow-hidden transition-all transform duration-300 opacity-0 scale-95 ease-out flex flex-col max-h-[90vh]">
             <div class="px-6 py-4 border-b border-gray-150 dark:border-amoled-border flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
                 <h3 class="font-bold text-gray-900 dark:text-zinc-100">تنظیمات پنل</h3>
                 <button onclick="toggleSettingsModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <div class="p-6 space-y-4">
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
                 <div>
                     <label class="block text-sm font-medium mb-1.5 text-gray-700 dark:text-zinc-300">موقعیت جغرافیایی پروکسی (Cloudflare)</label>
                     <div class="relative">
@@ -2293,10 +2288,10 @@ const HTML_TEMPLATES = {
                     <h4 class="text-sm font-bold mb-3 text-gray-800 dark:text-zinc-200">💾 پشتیبان‌گیری و بازیابی</h4>
                     <div class="grid grid-cols-2 gap-3">
                         <button type="button" onclick="exportUsersBackup()" class="py-2.5 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-900/50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
-                            📤 دانلود بک‌آپ
+                            📤 پشتیبان گیری
                         </button>
                         <button type="button" onclick="triggerImportBackup()" class="py-2.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-900/50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
-                            📥 بارگذاری بک‌آپ
+                            📥 بازیابی
                         </button>
                     </div>
                     <input type="file" id="backup-file-input" onchange="importUsersBackup(event)" accept=".json" class="hidden">
@@ -2343,7 +2338,6 @@ const HTML_TEMPLATES = {
             </button>
         </div>
     </div>
-
     <!-- Floating Bulk Actions Bar -->
     <div id="bulk-actions-bar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[40] bg-white dark:bg-zinc-900/90 border border-gray-200 dark:border-zinc-800/80 px-6 py-4 rounded-2xl shadow-2xl flex flex-wrap items-center justify-between gap-4 w-[95%] max-w-4xl transition-all duration-300 transform translate-y-28 opacity-0 pointer-events-none backdrop-blur-md">
         <div class="flex items-center gap-2">
@@ -2374,7 +2368,6 @@ const HTML_TEMPLATES = {
             </button>
         </div>
     </div>
-
     <!-- Bulk Edit Modal -->
     <div id="bulk-edit-modal" class="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/70 opacity-0 pointer-events-none transition-opacity duration-200 ease-out">
         <div id="bulk-edit-modal-card" class="w-full max-w-xl bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-xl overflow-hidden transition-[opacity,transform] duration-200 opacity-0 scale-95 ease-out flex flex-col max-h-[90vh] transform-gpu" style="will-change: transform, opacity;">
@@ -2491,10 +2484,8 @@ const HTML_TEMPLATES = {
             </form>
         </div>
     </div>
-
     <script>
         window.selectedUsernames = new Set();
-
         function toggleSelectAllUsers(el) {
             const checkboxes = document.querySelectorAll('input[name="select-user"]');
             checkboxes.forEach(cb => {
@@ -2508,7 +2499,6 @@ const HTML_TEMPLATES = {
             });
             updateBulkActionsBar();
         }
-
         function onUserSelectChange(el) {
             const username = decodeURIComponent(el.value);
             if (el.checked) {
@@ -2518,17 +2508,14 @@ const HTML_TEMPLATES = {
             }
             updateBulkActionsBar();
         }
-
         function updateBulkActionsBar() {
             const bar = document.getElementById('bulk-actions-bar');
             const countSpan = document.getElementById('bulk-selected-count');
             const selectAllCheckbox = document.getElementById('select-all-users');
             const selectedCount = window.selectedUsernames.size;
-            
             if (countSpan) {
                 countSpan.innerText = selectedCount + ' کاربر انتخاب شده';
             }
-            
             const checkboxes = document.querySelectorAll('input[name="select-user"]');
             if (checkboxes.length > 0) {
                 const allChecked = Array.from(checkboxes).every(cb => cb.checked);
@@ -2536,7 +2523,6 @@ const HTML_TEMPLATES = {
             } else {
                 if (selectAllCheckbox) selectAllCheckbox.checked = false;
             }
-
             if (selectedCount > 0) {
                 bar.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-28');
                 bar.classList.add('opacity-100', 'pointer-events-auto', 'translate-y-0');
@@ -2545,7 +2531,6 @@ const HTML_TEMPLATES = {
                 bar.classList.add('opacity-0', 'pointer-events-none', 'translate-y-28');
             }
         }
-
         async function bulkDelete() {
             const usernames = Array.from(window.selectedUsernames);
             if (usernames.length === 0) return;
@@ -2553,7 +2538,6 @@ const HTML_TEMPLATES = {
                 const bar = document.getElementById('bulk-actions-bar');
                 const buttons = bar.querySelectorAll('button');
                 buttons.forEach(btn => btn.disabled = true);
-                
                 try {
                     let successCount = 0;
                     await Promise.all(usernames.map(async (uname) => {
@@ -2573,7 +2557,6 @@ const HTML_TEMPLATES = {
                 }
             }
         }
-
         async function bulkToggleStatus(targetActive) {
             const usernames = Array.from(window.selectedUsernames);
             if (usernames.length === 0) return;
@@ -2582,7 +2565,6 @@ const HTML_TEMPLATES = {
                 const bar = document.getElementById('bulk-actions-bar');
                 const buttons = bar.querySelectorAll('button');
                 buttons.forEach(btn => btn.disabled = true);
-                
                 try {
                     let successCount = 0;
                     await Promise.all(usernames.map(async (uname) => {
@@ -2590,7 +2572,6 @@ const HTML_TEMPLATES = {
                         if (!user) return;
                         const isCurrentActive = user.is_active !== 0;
                         const shouldToggle = (targetActive === 1 && !isCurrentActive) || (targetActive === 0 && isCurrentActive);
-                        
                         if (shouldToggle) {
                             try {
                                 const res = await fetch('/api/users/' + encodeURIComponent(uname), {
@@ -2612,7 +2593,6 @@ const HTML_TEMPLATES = {
                 }
             }
         }
-
         async function bulkReset(actionType) {
             const usernames = Array.from(window.selectedUsernames);
             if (usernames.length === 0) return;
@@ -2620,12 +2600,10 @@ const HTML_TEMPLATES = {
             if (actionType === 'volume') actionName = 'حجم مصرفی';
             else if (actionType === 'req') actionName = 'تعداد ریکوئست‌ها';
             else if (actionType === 'time') actionName = 'زمان اشتراک';
-            
             if (confirm('آیا از ریست کردن گروهی ' + actionName + ' برای ' + usernames.length + ' کاربر انتخاب شده مطمئن هستید؟')) {
                 const bar = document.getElementById('bulk-actions-bar');
                 const buttons = bar.querySelectorAll('button');
                 buttons.forEach(btn => btn.disabled = true);
-                
                 try {
                     let successCount = 0;
                     await Promise.all(usernames.map(async (uname) => {
@@ -2646,7 +2624,6 @@ const HTML_TEMPLATES = {
                 }
             }
         }
-
         function toggleBulkEditModal(show) {
             const modal = document.getElementById('bulk-edit-modal');
             const card = document.getElementById('bulk-edit-modal-card');
@@ -2663,55 +2640,42 @@ const HTML_TEMPLATES = {
                 document.getElementById('bulk-edit-form').reset();
             }
         }
-
         function bulkEdit() {
             toggleBulkEditModal(true);
         }
-
         async function handleBulkEditSubmit(event) {
             event.preventDefault();
             const submitButton = document.getElementById('bulk-submit-btn');
             submitButton.disabled = true;
             submitButton.innerText = 'در حال ثبت تغییرات...';
-            
             const usernames = Array.from(window.selectedUsernames);
-            
             const applyLimit = document.getElementById('bulk-apply-limit').checked;
             const limitValue = document.getElementById('bulk-input-limit').value || null;
-            
             const applyExpiry = document.getElementById('bulk-apply-expiry').checked;
             const expiryValue = document.getElementById('bulk-input-expiry').value || null;
-            
             const applyReqLimit = document.getElementById('bulk-apply-req-limit').checked;
             const reqLimitValue = document.getElementById('bulk-input-req-limit').value || null;
-            
             const applyMaxConnections = document.getElementById('bulk-apply-max-connections').checked;
             const maxConnectionsValue = document.getElementById('bulk-input-max-connections').value || null;
-            
             const applyFingerprint = document.getElementById('bulk-apply-fingerprint').checked;
             const fingerprintValue = document.getElementById('bulk-fingerprint-select').value;
-            
             const applyPorts = document.getElementById('bulk-apply-ports').checked;
             const checkedPorts = Array.from(document.querySelectorAll('input[name="bulk-ports"]:checked')).map(cb => cb.value);
             const portsValue = checkedPorts.join(',');
             const tlsValue = checkedPorts.some(p => tlsPorts.includes(p)) ? 'on' : 'off';
-            
             const applyIps = document.getElementById('bulk-apply-ips').checked;
             const ipsValue = document.getElementById('bulk-input-ips').value;
-            
             if (!applyLimit && !applyExpiry && !applyReqLimit && !applyMaxConnections && !applyFingerprint && !applyPorts && !applyIps) {
                 alert('⚠️ لطفا حداقل یک فیلد را برای اعمال تغییر انتخاب کنید!');
                 submitButton.disabled = false;
                 submitButton.innerText = 'ثبت تغییرات گروهی';
                 return;
             }
-            
             try {
                 let successCount = 0;
                 await Promise.all(usernames.map(async (uname) => {
                     const user = window.allUsers.find(u => u.username === uname);
                     if (!user) return;
-                    
                     const limit = applyLimit ? limitValue : user.limit_gb;
                     const expiry = applyExpiry ? expiryValue : user.expiry_days;
                     const reqLimit = applyReqLimit ? reqLimitValue : user.limit_req;
@@ -2720,7 +2684,6 @@ const HTML_TEMPLATES = {
                     const port = applyPorts ? portsValue : user.port;
                     const tls = applyPorts ? tlsValue : user.tls;
                     const ips = applyIps ? ipsValue : user.ips;
-                    
                     try {
                         const response = await fetch('/api/users/' + encodeURIComponent(uname), {
                             method: 'PUT',
@@ -2754,7 +2717,6 @@ const HTML_TEMPLATES = {
                 submitButton.innerText = 'ثبت تغییرات گروهی';
             }
         }
-
         window.globalFragLen = "20-30";
         window.globalFragInt = "1-2";
         const tlsPorts = ['443', '2053', '2083', '2087', '2096', '8443'];
@@ -3562,46 +3524,37 @@ function editUser(encodedUsername) {
             downloadAnchor.click();
             downloadAnchor.remove();
         }
-
         function triggerImportBackup() {
             document.getElementById('backup-file-input').click();
         }
-
         async function importUsersBackup(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
             const reader = new FileReader();
             reader.onload = async function(e) {
                 const importBtn = document.querySelector('button[onclick="triggerImportBackup()"]');
                 const exportBtn = document.querySelector('button[onclick="exportUsersBackup()"]');
                 const closeBtn = document.querySelector('#settings-modal button[onclick="toggleSettingsModal(false)"]');
-                
                 try {
                     const backupUsers = JSON.parse(e.target.result);
                     if (!Array.isArray(backupUsers)) {
                         alert('❌ فایل پشتیبان نامعتبر است! ساختار فایل باید آرایه‌ای از کاربران باشد.');
                         return;
                     }
-                    
                     const validBackupUsers = backupUsers.filter(u => u && typeof u === 'object' && u.username);
                     if (validBackupUsers.length === 0) {
                         alert('❌ هیچ کاربر معتبری در فایل پشتیبان یافت نشد!');
                         return;
                     }
-                    
                     const existingUsernames = new Set((window.allUsers || []).map(u => u.username));
                     const duplicates = validBackupUsers.filter(u => existingUsernames.has(u.username));
-                    
                     let overwrite = false;
                     if (duplicates.length > 0) {
                         overwrite = confirm('⚠️ تعداد ' + duplicates.length + ' کاربر تکراری شناسایی شد. آیا می‌خواهید اطلاعات آن‌ها با فایل پشتیبان بازنویسی شود؟\\n(در صورت انتخاب لغو، کاربران تکراری نادیده گرفته می‌شوند)');
                     }
-                    
                     if (importBtn) importBtn.disabled = true;
                     if (exportBtn) exportBtn.disabled = true;
                     if (closeBtn) closeBtn.disabled = true;
-                    
                     let successCount = 0;
                     let currentStep = 0;
                     for (const u of validBackupUsers) {
@@ -3609,7 +3562,6 @@ function editUser(encodedUsername) {
                         if (importBtn) {
                             importBtn.innerText = '⏳ بازیابی (' + currentStep + '/' + validBackupUsers.length + ')';
                         }
-                        
                         const exists = existingUsernames.has(u.username);
                         if (exists) {
                             if (overwrite) {
@@ -3666,7 +3618,6 @@ function editUser(encodedUsername) {
                             } catch(err) {}
                         }
                     }
-                    
                     alert('✅ عملیات بازیابی با موفقیت انجام شد. ' + successCount + ' کاربر بازیابی شدند.');
                     toggleSettingsModal(false);
                     await loadUsers(true);
@@ -3684,7 +3635,6 @@ function editUser(encodedUsername) {
             };
             reader.readAsText(file);
         }
-
         async function changeAdminPassword() {
             const currentPwd = document.getElementById('change-pwd-current').value;
             const newPwd = document.getElementById('change-pwd-new').value;
@@ -3729,7 +3679,7 @@ function editUser(encodedUsername) {
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.4.10';
+const CURRENT_VERSION = '1.5.2';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		async function checkForUpdates(isManual = false) {
             try {
@@ -4041,7 +3991,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </a>
     <a href="https://t.me/IR_NETLIFY" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-gray-700 dark:text-zinc-300 hover:text-sky-500 dark:hover:text-sky-400 group">
         <svg class="w-5 h-5 text-sky-500 group-hover:scale-110 transition" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.94-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.37.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .24z"/></svg>
-        @IR_NETLIFY
+        IR_NETLIFY@
     </a>
 </div>
     <script>
