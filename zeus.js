@@ -198,7 +198,7 @@ const Router = {
 			}
 			try {
 				const cfRes = await fetch("https://api.cloudflare.com/client/v4/user/tokens/verify", {
-					headers: { "Authorization": "Bearer " + api_token }
+					headers: { Authorization: "Bearer " + api_token },
 				});
 				const cfData = await cfRes.json();
 				if (!cfRes.ok || !cfData.success) {
@@ -213,13 +213,13 @@ const Router = {
 					const parts = host.split(".");
 					const targetSubdomain = parts[parts.length - 3];
 					const accountsRes = await fetch("https://api.cloudflare.com/client/v4/accounts", {
-						headers: { "Authorization": "Bearer " + api_token }
+						headers: { Authorization: "Bearer " + api_token },
 					});
 					const accountsData = await accountsRes.json();
 					if (accountsData.success && accountsData.result) {
 						for (const acc of accountsData.result) {
 							const subRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acc.id}/workers/subdomain`, {
-								headers: { "Authorization": "Bearer " + api_token }
+								headers: { Authorization: "Bearer " + api_token },
 							});
 							const subData = await subRes.json();
 							if (subData.success && subData.result && subData.result.subdomain === targetSubdomain) {
@@ -230,7 +230,7 @@ const Router = {
 					}
 				} else {
 					const zonesRes = await fetch("https://api.cloudflare.com/client/v4/zones", {
-						headers: { "Authorization": "Bearer " + api_token }
+						headers: { Authorization: "Bearer " + api_token },
 					});
 					const zonesData = await zonesRes.json();
 					if (zonesData.success && zonesData.result) {
@@ -279,7 +279,7 @@ const Router = {
 			try {
 				if (!currentAccountId) {
 					const accRes = await fetch("https://api.cloudflare.com/client/v4/accounts", {
-						headers: { "Authorization": "Bearer " + currentToken }
+						headers: { Authorization: "Bearer " + currentToken },
 					});
 					const accData = await accRes.json();
 					if (!accData.success || accData.result.length === 0) throw new Error("توکن نامعتبر است یا اکانتی یافت نشد.");
@@ -314,10 +314,10 @@ const Router = {
 					}
 				}
 
-				if (!newBindings.some(b => b.name === "CF_API_TOKEN")) {
+				if (!newBindings.some((b) => b.name === "CF_API_TOKEN")) {
 					newBindings.push({ type: "secret_text", name: "CF_API_TOKEN", text: currentToken });
 				}
-				if (!newBindings.some(b => b.name === "CF_ACCOUNT_ID")) {
+				if (!newBindings.some((b) => b.name === "CF_ACCOUNT_ID")) {
 					newBindings.push({ type: "secret_text", name: "CF_ACCOUNT_ID", text: currentAccountId });
 				}
 
@@ -593,12 +593,21 @@ const Router = {
 					const parsedIsActive = parseInt(is_active);
 					const finalIsActive = !isNaN(parsedIsActive) ? parsedIsActive : 1;
 					try {
-						await env.DB.prepare("INSERT INTO users (username, uuid, limit_gb, expiry_days, limit_req, ips, connection_type, tls, port, fingerprint, max_connections, ip_limit, used_gb, used_req, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-							.bind(username, finalUuid, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, atob("dmxlc3M="), tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, finalUsedGb, finalUsedReq, finalCreatedAt, finalIsActive)
+						await env.DB.prepare("INSERT INTO users (username, uuid, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit, used_gb, used_req, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+							.bind(username, finalUuid, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, tls || "none", port || "443", fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, finalUsedGb, finalUsedReq, finalCreatedAt, finalIsActive)
 							.run();
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
-					} catch (err) {
-						return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+					} catch (error) {
+						if (error.message && error.message.includes("UNIQUE constraint failed")) {
+							return new Response(JSON.stringify({ success: false, error: "USERNAME_ALREADY_EXISTS" }), {
+								status: 400,
+								headers: { "Content-Type": "application/json" },
+							});
+						}
+						return new Response(JSON.stringify({ success: false, error: error.message }), {
+							status: 500,
+							headers: { "Content-Type": "application/json" },
+						});
 					}
 				}
 			}
@@ -703,7 +712,7 @@ function getActiveIpCount(activeIpsJson) {
 		const now = Date.now();
 		let count = 0;
 		for (const [ip, data] of Object.entries(activeIps)) {
-			const lastSeen = (data && typeof data === 'object') ? data.timestamp : data;
+			const lastSeen = data && typeof data === "object" ? data.timestamp : data;
 			if (now - lastSeen <= 30000) {
 				count++;
 			}
@@ -805,7 +814,7 @@ async function flushExpiredTraffic(env) {
 	}
 }
 async function handleVLESS(env, storedData = null, ctx = null, request = null) {
-	const clientIP = request ? (request.headers.get("CF-Connecting-IP") || "unknown") : "unknown";
+	const clientIP = request ? request.headers.get("CF-Connecting-IP") || "unknown" : "unknown";
 	const socketPair = new WebSocketPair();
 	const [clientSock, serverSock] = Object.values(socketPair);
 	serverSock.accept();
@@ -868,9 +877,9 @@ async function handleVLESS(env, storedData = null, ctx = null, request = null) {
 					const user = await env.DB.prepare("SELECT active_ips FROM users WHERE uuid = ?").bind(validUUID).first();
 					if (user) {
 						console.log(`[setOffline Task] DB active_ips for ${uname}: ${user.active_ips}`);
-						let activeIps = JSON.parse(user.active_ips || '{}');
+						let activeIps = JSON.parse(user.active_ips || "{}");
 						if (activeIps[clientIP]) {
-							if (typeof activeIps[clientIP] === 'object') {
+							if (typeof activeIps[clientIP] === "object") {
 								activeIps[clientIP].count = (activeIps[clientIP].count || 1) - 1;
 								if (activeIps[clientIP].count <= 0) {
 									delete activeIps[clientIP];
@@ -878,8 +887,7 @@ async function handleVLESS(env, storedData = null, ctx = null, request = null) {
 							} else {
 								delete activeIps[clientIP];
 							}
-							await env.DB.prepare("UPDATE users SET active_ips = ? WHERE uuid = ?")
-								.bind(JSON.stringify(activeIps), validUUID).run();
+							await env.DB.prepare("UPDATE users SET active_ips = ? WHERE uuid = ?").bind(JSON.stringify(activeIps), validUUID).run();
 							console.log(`[setOffline Task] Updated active_ips in DB to: ${JSON.stringify(activeIps)}`);
 						} else {
 							console.log(`[setOffline Task] IP ${clientIP} not found in user's active_ips`);
@@ -962,12 +970,12 @@ async function handleVLESS(env, storedData = null, ctx = null, request = null) {
 						if (!isExpired && clientIP && clientIP !== "unknown") {
 							let activeIps = {};
 							try {
-								activeIps = JSON.parse(user.active_ips || '{}');
+								activeIps = JSON.parse(user.active_ips || "{}");
 							} catch (e) {}
 							const nowTime = Date.now();
 							let hasChanges = false;
 							for (const [ip, data] of Object.entries(activeIps)) {
-								const lastSeen = (data && typeof data === 'object') ? data.timestamp : data;
+								const lastSeen = data && typeof data === "object" ? data.timestamp : data;
 								if (nowTime - lastSeen > 30000) {
 									delete activeIps[ip];
 									hasChanges = true;
@@ -978,8 +986,8 @@ async function handleVLESS(env, storedData = null, ctx = null, request = null) {
 								console.log(`[Heartbeat] IP ${clientIP} expired from active_ips due to inactivity.`);
 							} else {
 								const sortedIps = Object.keys(activeIps).sort((a, b) => {
-									const tA = (activeIps[a] && typeof activeIps[a] === 'object') ? activeIps[a].timestamp : activeIps[a];
-									const tB = (activeIps[b] && typeof activeIps[b] === 'object') ? activeIps[b].timestamp : activeIps[b];
+									const tA = activeIps[a] && typeof activeIps[a] === "object" ? activeIps[a].timestamp : activeIps[a];
+									const tB = activeIps[b] && typeof activeIps[b] === "object" ? activeIps[b].timestamp : activeIps[b];
 									return tB - tA;
 								});
 								const clientIpIndex = sortedIps.indexOf(clientIP);
@@ -1128,19 +1136,19 @@ async function handleVLESS(env, storedData = null, ctx = null, request = null) {
 				console.log(`[VLESS Handshake] User: ${user.username}, clientIP: ${clientIP}, active_ips in DB: ${user.active_ips}`);
 				let activeIps = {};
 				try {
-					activeIps = JSON.parse(user.active_ips || '{}');
+					activeIps = JSON.parse(user.active_ips || "{}");
 				} catch (e) {}
 				const now = Date.now();
 				for (const [ip, data] of Object.entries(activeIps)) {
-					const lastSeen = (data && typeof data === 'object') ? data.timestamp : data;
+					const lastSeen = data && typeof data === "object" ? data.timestamp : data;
 					if (now - lastSeen > 30000) {
 						delete activeIps[ip];
 					}
 				}
 				if (!activeIps[clientIP]) {
 					const sortedIps = Object.keys(activeIps).sort((a, b) => {
-						const tA = (activeIps[a] && typeof activeIps[a] === 'object') ? activeIps[a].timestamp : activeIps[a];
-						const tB = (activeIps[b] && typeof activeIps[b] === 'object') ? activeIps[b].timestamp : activeIps[b];
+						const tA = activeIps[a] && typeof activeIps[a] === "object" ? activeIps[a].timestamp : activeIps[a];
+						const tB = activeIps[b] && typeof activeIps[b] === "object" ? activeIps[b].timestamp : activeIps[b];
 						return tB - tA;
 					});
 					console.log(`[VLESS Handshake] Non-expired active IPs: ${JSON.stringify(activeIps)}, count: ${sortedIps.length}, limit: ${user.ip_limit}`);
@@ -1151,7 +1159,7 @@ async function handleVLESS(env, storedData = null, ctx = null, request = null) {
 					}
 					activeIps[clientIP] = { timestamp: now, count: 1 };
 				} else {
-					if (typeof activeIps[clientIP] === 'object') {
+					if (typeof activeIps[clientIP] === "object") {
 						activeIps[clientIP].timestamp = now;
 						activeIps[clientIP].count = (activeIps[clientIP].count || 0) + 1;
 					} else {
@@ -1160,8 +1168,7 @@ async function handleVLESS(env, storedData = null, ctx = null, request = null) {
 					console.log(`[VLESS Handshake] Reconnected from same IP: ${clientIP}, count: ${activeIps[clientIP].count}`);
 				}
 				try {
-					await env.DB.prepare("UPDATE users SET active_ips = ?, last_active = ? WHERE uuid = ?")
-						.bind(JSON.stringify(activeIps), now, reqUUID).run();
+					await env.DB.prepare("UPDATE users SET active_ips = ?, last_active = ? WHERE uuid = ?").bind(JSON.stringify(activeIps), now, reqUUID).run();
 					console.log(`[VLESS Handshake] Successfully updated active_ips to: ${JSON.stringify(activeIps)}`);
 				} catch (e) {
 					console.error(`[VLESS Handshake] DB Update Error: ${e.message}`);
@@ -2052,7 +2059,7 @@ const HTML_TEMPLATES = {
 </body>
 </html>`,
 
-login: `<!DOCTYPE html>
+	login: `<!DOCTYPE html>
 <html lang="fa" dir="rtl" class="dark">
 <head>
     <meta charset="UTF-8">
@@ -2503,6 +2510,20 @@ login: `<!DOCTYPE html>
         </button>
     </div>
 </div>
+<div id="free-panel-warning-modal" class="fixed inset-0 z-[85] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 ease-out">
+    <div class="w-full max-w-md bg-white dark:bg-amoled-card border border-rose-500/50 rounded-3xl shadow-2xl overflow-hidden p-6 text-center transition-all transform duration-300 opacity-0 scale-95 ease-out">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-500 mb-4 shadow-inner">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        </div>
+        <h3 class="font-black text-xl text-gray-900 dark:text-white mb-2">پیام همگانی</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium">
+            این پنل کاملاً <span class="text-rose-500 font-bold">رایگان</span> است. هرگونه فروش پنل یا کانفیگ‌های آن  اوج بی شرفی و بی ناموسی است. لطفاً از این ابزار فقط به صورت شخصی و رایگان استفاده کنید.
+        </p>
+        <button onclick="closeFreePanelWarning()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-sm transition duration-300 shadow-lg shadow-rose-500/25">
+            تأیید و موافقت
+        </button>
+    </div>
+</div>
     <div id="user-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 opacity-0 pointer-events-none transition-opacity duration-200 ease-out">
         <div id="user-modal-card" class="w-full max-w-xl bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-xl overflow-hidden transition-[opacity,transform] duration-200 opacity-0 scale-95 ease-out flex flex-col max-h-[90vh] transform-gpu" style="will-change: transform, opacity;">
             <div class="px-6 py-4 border-b border-gray-150 dark:border-zinc-800/80 flex justify-between items-center bg-gray-50/50 dark:bg-zinc-900/30">
@@ -2780,6 +2801,19 @@ login: `<!DOCTYPE html>
             </div>
         </div>
     </div>
+<div id="qr-modal" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 opacity-0 pointer-events-none transition-opacity duration-200 ease-out">
+    <div id="qr-modal-card" class="w-full max-w-sm bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-3xl shadow-2xl p-6 transform transition-all scale-95 opacity-0 duration-200 text-center">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white">QR Code</h3>
+            <button onclick="toggleQrModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="flex justify-center bg-white p-4 rounded-xl mb-4">
+            <div id="qrcode-container"></div>
+        </div>
+    </div>
+</div>
     <div id="bulk-actions-bar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[40] bg-white dark:bg-zinc-900/90 border border-gray-200 dark:border-zinc-800/80 px-6 py-4 rounded-2xl shadow-2xl flex flex-wrap items-center justify-between gap-4 w-[95%] max-w-4xl transition-all duration-300 transform translate-y-28 opacity-0 pointer-events-none backdrop-blur-md">
         <div class="flex items-center gap-2">
             <span class="w-3 h-3 bg-blue-500 rounded-full animate-pulse shadow-sm shadow-blue-500/50"></span>
@@ -2917,7 +2951,81 @@ login: `<!DOCTYPE html>
             </form>
         </div>
     </div>
+<div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+<div id="custom-confirm-modal" class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 ease-out">
+    <div id="custom-confirm-card" class="w-full max-w-sm bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-3xl shadow-2xl overflow-hidden p-6 text-center transform transition-all scale-95 duration-300 pointer-events-auto">
+        <h3 class="font-black text-xl text-gray-900 dark:text-white mb-3">تأیید عملیات</h3>
+        <p id="custom-confirm-message" class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium"></p>
+        <div class="flex gap-3">
+            <button id="custom-confirm-cancel" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 font-bold rounded-xl text-sm transition duration-200">انصراف</button>
+            <button id="custom-confirm-ok" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition duration-200 shadow-lg">تأیید</button>
+        </div>
+    </div>
+</div>
     <script>
+		function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = type === 'error' 
+                ? 'bg-red-50 dark:bg-red-900/40 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400' 
+                : 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400';
+            
+            toast.className = 'px-4 py-3 border rounded-xl shadow-lg font-bold text-sm transform transition-all duration-300 -translate-y-full opacity-0 ' + colors;
+            toast.innerText = message;
+            
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => {
+                toast.classList.remove('-translate-y-full', 'opacity-0');
+            });
+            
+            setTimeout(() => {
+                toast.classList.add('-translate-y-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function customConfirm(message) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('custom-confirm-modal');
+                const card = document.getElementById('custom-confirm-card');
+                const msgEl = document.getElementById('custom-confirm-message');
+                const btnOk = document.getElementById('custom-confirm-ok');
+                const btnCancel = document.getElementById('custom-confirm-cancel');
+
+                msgEl.innerText = message;
+
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.classList.add('opacity-100', 'pointer-events-auto');
+                card.classList.remove('scale-95');
+                card.classList.add('scale-100');
+
+                const cleanup = () => {
+                    modal.classList.remove('opacity-100', 'pointer-events-auto');
+                    modal.classList.add('opacity-0', 'pointer-events-none');
+                    card.classList.remove('scale-100');
+                    card.classList.add('scale-95');
+                    btnOk.removeEventListener('click', onOk);
+                    btnCancel.removeEventListener('click', onCancel);
+                };
+
+                const onOk = () => { cleanup(); resolve(true); };
+                const onCancel = () => { cleanup(); resolve(false); };
+
+                btnOk.addEventListener('click', onOk);
+                btnCancel.addEventListener('click', onCancel);
+            });
+        }
+
+        window.alert = function(message) {
+            const msgStr = message ? message.toString() : '';
+            if (msgStr.includes('خطا') || msgStr.includes('⚠️') || msgStr.includes('❌')) {
+                showToast(msgStr, 'error');
+            } else {
+                showToast(msgStr, 'success');
+            }
+        };
         window.selectedUsernames = new Set();
         function toggleSelectAllUsers(el) {
             const checkboxes = document.querySelectorAll('input[name="select-user"]');
@@ -2967,7 +3075,7 @@ login: `<!DOCTYPE html>
         async function bulkDelete() {
             const usernames = Array.from(window.selectedUsernames);
             if (usernames.length === 0) return;
-            if (confirm('⚠️ آیا از حذف گروهی ' + usernames.length + ' کاربر انتخاب شده مطمئن هستید؟ این عمل غیرقابل بازگشت است.')) {
+            if (await customConfirm('⚠️ آیا از حذف گروهی ' + usernames.length + ' کاربر انتخاب شده مطمئن هستید؟ این عمل غیرقابل بازگشت است.')) {
                 const bar = document.getElementById('bulk-actions-bar');
                 const buttons = bar.querySelectorAll('button');
                 buttons.forEach(btn => btn.disabled = true);
@@ -2994,7 +3102,7 @@ login: `<!DOCTYPE html>
             const usernames = Array.from(window.selectedUsernames);
             if (usernames.length === 0) return;
             const actionText = targetActive === 1 ? 'فعال‌سازی' : 'غیرفعال‌سازی';
-            if (confirm('آیا از ' + actionText + ' گروهی ' + usernames.length + ' کاربر انتخاب شده مطمئن هستید؟')) {
+            if (await customConfirm('آیا از ' + actionText + ' گروهی ' + usernames.length + ' کاربر انتخاب شده مطمئن هستید؟')) {
                 const bar = document.getElementById('bulk-actions-bar');
                 const buttons = bar.querySelectorAll('button');
                 buttons.forEach(btn => btn.disabled = true);
@@ -3033,7 +3141,7 @@ login: `<!DOCTYPE html>
             if (actionType === 'volume') actionName = 'حجم مصرفی';
             else if (actionType === 'req') actionName = 'تعداد ریکوئست‌ها';
             else if (actionType === 'time') actionName = 'زمان اشتراک';
-            if (confirm('آیا از ریست کردن گروهی ' + actionName + ' برای ' + usernames.length + ' کاربر انتخاب شده مطمئن هستید؟')) {
+            if (await customConfirm('آیا از ریست کردن گروهی ' + actionName + ' برای ' + usernames.length + ' کاربر انتخاب شده مطمئن هستید؟')) {
                 const bar = document.getElementById('bulk-actions-bar');
                 const buttons = bar.querySelectorAll('button');
                 buttons.forEach(btn => btn.disabled = true);
@@ -3281,7 +3389,7 @@ login: `<!DOCTYPE html>
             }
         });
 		async function restartCore() {
-            if (!confirm('آیا از ری‌استارت هسته ورکر مطمئن هستید؟ این کار تمام اتصالات فعلی را قطع می‌کند.')) return;
+            if (!await customConfirm('آیا از ری‌استارت هسته ورکر مطمئن هستید؟ این کار تمام اتصالات فعلی را قطع می‌کند.')) return;
             
             const btn = document.querySelector('button[title="ری‌استارت هسته ورکر"]');
             if (btn) {
@@ -3626,6 +3734,12 @@ login: `<!DOCTYPE html>
 							                'ساب متنی' +
 							            '</button>' +
 							        '</div>' +
+									'<div class="flex gap-1">' +
+							            '<button onclick="showSubQr(\\'' + encodeURIComponent(user.username) + '\\')" class="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded-lg text-xs font-bold transition border border-amber-200 dark:border-amber-800">' +
+							                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 19h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>' +
+							                'QR ساب' +
+							            '</button>' +
+							        '</div>' +
 							        '<div class="flex gap-1">' +
 							            '<button onclick="copyStatusLink(\\'' + encodeURIComponent(user.username) + '\\')" class="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg text-xs font-bold transition border border-emerald-200 dark:border-emerald-800">' +
 							                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' +
@@ -3657,11 +3771,11 @@ login: `<!DOCTYPE html>
         }
 async function resetUserData(encodedUsername, actionType) {
             const username = decodeURIComponent(encodedUsername);
-            let actionName = '';
-            if (actionType === 'volume') actionName = 'حجم';
-            else if (actionType === 'req') actionName = 'ریکوئست';
-            else if (actionType === 'time') actionName = 'زمان';
-            if (confirm('آیا از ریست کردن ' + actionName + ' کاربر ' + username + ' مطمئن هستید؟')) {
+			let actionName = '';
+			if (actionType === 'volume') actionName = 'حجم';
+			else if (actionType === 'req') actionName = 'ریکوئست';
+			else if (actionType === 'time') actionName = 'زمان';
+			if (await customConfirm('آیا از ریست کردن ' + actionName + ' کاربر ' + username + ' مطمئن هستید؟')) {
                 try {
                     const response = await fetch('/api/users/' + encodeURIComponent(username), {
                         method: 'PUT',
@@ -3732,7 +3846,11 @@ async function resetUserData(encodedUsername, actionType) {
                     await loadUsers(true);
                 } else {
                     const errData = await response.json();
-                    alert('خطا: ' + (errData.error || 'عملیات ناموفق بود'));
+                    if (errData.error === "USERNAME_ALREADY_EXISTS") {
+                        alert("خطا: نام کاربری تکراری است");
+                    } else {
+                        alert("Error: " + errData.error);
+                    }
                 }
             } catch (err) {
                 alert('خطا در برقراری ارتباط با سرور');
@@ -3767,6 +3885,14 @@ function openUsageWarning() {
     modal.classList.add('opacity-100', 'pointer-events-auto');
     card.classList.remove('opacity-0', 'scale-95');
     card.classList.add('opacity-100', 'scale-100');
+}
+function closeFreePanelWarning() {
+    const modal = document.getElementById('free-panel-warning-modal');
+    const card = modal.querySelector('div');
+    modal.classList.remove('opacity-100', 'pointer-events-auto');
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    card.classList.remove('opacity-100', 'scale-100');
+    card.classList.add('opacity-0', 'scale-95');
 }
         function getVlessLink(username) {
             const user = window.allUsers.find(u => u.username === username);
@@ -3807,6 +3933,37 @@ function openUsageWarning() {
             }).catch(() => {
                 alert('خطا در کپی کردن لینک ساب!');
             });
+        }
+		function toggleQrModal(show, text) {
+            const modal = document.getElementById('qr-modal');
+            const card = document.getElementById('qr-modal-card');
+            const container = document.getElementById('qrcode-container');
+            if (show) {
+                container.innerHTML = '';
+                new QRCode(container, {
+                    text: text,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.classList.add('opacity-100', 'pointer-events-auto');
+                card.classList.remove('opacity-0', 'scale-95');
+                card.classList.add('opacity-100', 'scale-100');
+            } else {
+                modal.classList.remove('opacity-100', 'pointer-events-auto');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                card.classList.remove('opacity-100', 'scale-100');
+                card.classList.add('opacity-0', 'scale-95');
+            }
+        }
+
+        function showSubQr(encodedUsername) {
+            const username = decodeURIComponent(encodedUsername);
+            const link = getSubLink(username);
+            toggleQrModal(true, link);
         }
         function copyStatusLink(encodedUsername) {
             const username = decodeURIComponent(encodedUsername);
@@ -3854,7 +4011,7 @@ function editUser(encodedUsername) {
 }
         async function deleteUser(encodedUsername) {
             const username = decodeURIComponent(encodedUsername);
-            if (confirm('آیا از حذف کاربر ' + username + ' مطمئن هستید؟')) {
+            if (await customConfirm('آیا از حذف کاربر ' + username + ' مطمئن هستید؟')) {
                 try {
                     const response = await fetch('/api/users/' + encodeURIComponent(username), { method: 'DELETE' });
                     if (response.ok) {
@@ -4018,7 +4175,7 @@ function editUser(encodedUsername) {
                     const duplicates = validBackupUsers.filter(u => existingUsernames.has(u.username));
                     let overwrite = false;
                     if (duplicates.length > 0) {
-                        overwrite = confirm('⚠️ تعداد ' + duplicates.length + ' کاربر تکراری شناسایی شد. آیا می‌خواهید اطلاعات آن‌ها با فایل پشتیبان بازنویسی شود؟\\n(در صورت انتخاب لغو، کاربران تکراری نادیده گرفته می‌شوند)');
+                        overwrite = await customConfirm('⚠️ تعداد ' + duplicates.length + ' کاربر تکراری شناسایی شد. آیا می‌خواهید اطلاعات آن‌ها با فایل پشتیبان بازنویسی شود؟\\n(در صورت انتخاب لغو، کاربران تکراری نادیده گرفته می‌شوند)');
                     }
                     if (importBtn) importBtn.disabled = true;
                     if (exportBtn) exportBtn.disabled = true;
@@ -4140,14 +4297,14 @@ function editUser(encodedUsername) {
             }
         }
         async function logoutAdmin() {
-            if (confirm('⚠️ آیا می‌خواهید از پنل خارج شوید؟')) {
+            if (await customConfirm('⚠️ آیا می‌خواهید از پنل خارج شوید؟')) {
                 try {
                     await fetch('/api/logout', { method: 'POST' });
                 } catch (err) {}
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.5.6';
+const CURRENT_VERSION = '1.5.7';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		async function checkForUpdates(isManual = false) {
             try {
@@ -4228,10 +4385,10 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
                     return;
                 }
                 if (res.ok && data.success) {
-                    alert('پنل با موفقیت آپدیت شد و دسترسی‌های کلودفلر تنظیم شدند! در حال راه‌اندازی مجدد (۵ ثانیه صبر کنید)...');
+                    alert('پنل با موفقیت آپدیت شد و دسترسی‌های کلودفلر تنظیم شدند! در حال راه‌اندازی مجدد (2 ثانیه صبر کنید)...');
                     setTimeout(() => {
                         window.location.reload();
-                    }, 5000);
+                    }, 2000);
                 } else {
                     alert('خطا در بروزرسانی. لطفاً با استفاده از دکمه "آپدیت دستی" اقدام کنید.');
                     btn.disabled = false;
@@ -4332,6 +4489,12 @@ function applySelectedIps() {
     toggleIpSelectorModal(false);
 }
 document.addEventListener('DOMContentLoaded', () => {
+			const freeModal = document.getElementById('free-panel-warning-modal');
+            const freeCard = freeModal.querySelector('div');
+            freeModal.classList.remove('opacity-0', 'pointer-events-none');
+            freeModal.classList.add('opacity-100', 'pointer-events-auto');
+            freeCard.classList.remove('opacity-0', 'scale-95');
+            freeCard.classList.add('opacity-100', 'scale-100');
             if (localStorage.getItem('zeus_path_warned_' + CURRENT_VERSION) !== 'true') {
                 const modal = document.getElementById('path-warning-modal');
                 const card = modal.querySelector('div');
@@ -4477,6 +4640,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="flex items-center gap-2">⛓️ کپی لینک ساب‌اسکریپشن متنی</span>
                     <span class="text-indigo-500">کپی</span>
                 </button>
+				<button onclick="showSubQr()" class="w-full flex justify-between items-center px-4 py-3 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border hover:border-amber-500 dark:hover:border-amber-500 rounded-xl text-xs font-medium transition shadow-sm">
+                    <span class="flex items-center gap-2">📱 دریافت کیوآر کد ساب</span>
+                    <span class="text-amber-500">نمایش</span>
+                </button>
                 <button onclick="copyVlessConfig()" class="w-full flex justify-between items-center px-4 py-3 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border hover:border-blue-500 dark:hover:border-blue-500 rounded-xl text-xs font-medium transition shadow-sm">
                     <span class="flex items-center gap-2">🚀 کپی کانفیگ VLESS (مستقیم)</span>
                     <span class="text-blue-500">کپی</span>
@@ -4484,7 +4651,19 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         </div>
     </div>
-	
+<div id="qr-modal" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 opacity-0 pointer-events-none transition-opacity duration-200 ease-out">
+    <div id="qr-modal-card" class="w-full max-w-sm bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-3xl shadow-2xl p-6 transform transition-all scale-95 opacity-0 duration-200 text-center">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white">QR Code</h3>
+            <button onclick="toggleQrModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="flex justify-center bg-white p-4 rounded-xl mb-4">
+            <div id="qrcode-container"></div>
+        </div>
+    </div>
+</div>
 <div class="flex flex-col gap-4 mt-6 z-10">
     <div class="flex items-center gap-4 justify-center">
         <a href="https://github.com/IR-NETLIFY/zeus" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-gray-700 dark:text-zinc-300 hover:text-black dark:hover:text-white group">
@@ -4550,6 +4729,36 @@ document.addEventListener('DOMContentLoaded', () => {
         function copyTextSub() {
             const link = window.location.protocol + '//' + getHost() + '/sub/' + encodeURIComponent(window.statusUser.username);
             navigator.clipboard.writeText(link).then(() => alert('✅ لینک ساب متنی کپی شد!'));
+        }
+		function toggleQrModal(show, text) {
+            const modal = document.getElementById('qr-modal');
+            const card = document.getElementById('qr-modal-card');
+            const container = document.getElementById('qrcode-container');
+            if (show) {
+                container.innerHTML = '';
+                new QRCode(container, {
+                    text: text,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.classList.add('opacity-100', 'pointer-events-auto');
+                card.classList.remove('opacity-0', 'scale-95');
+                card.classList.add('opacity-100', 'scale-100');
+            } else {
+                modal.classList.remove('opacity-100', 'pointer-events-auto');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                card.classList.remove('opacity-100', 'scale-100');
+                card.classList.add('opacity-0', 'scale-95');
+            }
+        }
+
+        function showSubQr() {
+            const link = window.location.protocol + '//' + getHost() + '/sub/' + encodeURIComponent(window.statusUser.username);
+            toggleQrModal(true, link);
         }
         document.addEventListener('DOMContentLoaded', () => {
             const u = window.statusUser;
