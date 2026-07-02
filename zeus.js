@@ -20,16 +20,22 @@ const TCP_CONCURRENCY = 2;
 const PRELOAD_RACE_DIAL = true;
 function applyLocalSubscriptionPatch(code) {
 	let patched = code;
+	patched = patched.replace(/\n\s*const m1 = decodeURIComponent\([\s\S]*?\n\s*links\.push\([^\n]*encodeURIComponent\(m2\)\);/g, "");
+	patched = patched.replace(/\n\s*let remVol = "Unlimited";[\s\S]*?\n\s*links\.push\([^\n]*encodeURIComponent\(infoRemark\)\);/g, "");
 	if (!patched.includes('const plainContent = noise + filteredLinks.join("\\n");') && patched.includes('const plainContent = noise + links.join("\\n");')) {
-		patched = patched.replace('const plainContent = noise + links.join("\\n");', `const blockedSubscriptionRemarks = ["پنل رایگان", "غیر قابل فروش", "IR_NETLIFY", "ساخت رایگان", "remaining"];
-		const filteredLinks = links.filter((link) => !blockedSubscriptionRemarks.some((remark) => {
-			const rawRemark = link.split("#").pop() || "";
-			let decodedRemark = rawRemark;
+		patched = patched.replace('const plainContent = noise + links.join("\\n");', `function getSubscriptionRemark(link) {
+			const rawRemark = link.includes("#") ? link.split("#").pop() || "" : "";
 			try {
-				decodedRemark = decodeURIComponent(rawRemark);
-			} catch {}
-			return decodedRemark.includes(remark);
-		}));
+				return decodeURIComponent(rawRemark);
+			} catch {
+				return rawRemark;
+			}
+		}
+		const blockedSubscriptionRemarks = ["پنل رایگان", "غیر قابل فروش", "IR_NETLIFY", "ساخت رایگان", "remaining"];
+		const filteredLinks = links.filter((link) => {
+			const remark = getSubscriptionRemark(link);
+			return !blockedSubscriptionRemarks.some((blocked) => remark.includes(blocked));
+		});
 		const plainContent = noise + filteredLinks.join("\\n");`);
 	} else if (!patched.includes('const plainContent = noise + filteredLinks.join("\\n");')) {
 		throw new Error("Local customization patch failed: subscription output block not found");
@@ -754,29 +760,6 @@ const SubscriptionService = {
 			.filter((p) => p.length > 0);
 		const fp = user.fingerprint || "chrome";
 		const links = [];
-		const m1 = decodeURIComponent("%E2%9A%A0%EF%B8%8F%D9%BE%D9%86%D9%84%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%20%D9%88%20%D8%BA%DB%8C%D8%B1%20%D9%82%D8%A7%D8%A8%D9%84%20%D9%81%D8%B1%D9%88%D8%B4%E2%9A%A0%EF%B8%8F");
-		const m2 = decodeURIComponent("%F0%9F%9A%80%40IR_NETLIFY%20%D8%B3%D8%A7%D8%AE%D8%AA%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%F0%9F%9A%80");
-		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#" + encodeURIComponent(m1));
-		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#" + encodeURIComponent(m2));
-		let remVol = "Unlimited";
-		if (user.limit_gb) {
-			let rem = user.limit_gb - (user.used_gb || 0);
-			remVol = rem > 0 ? rem.toFixed(2) + "GB" : "0GB";
-		}
-		let remTime = "Unlimited";
-		if (user.expiry_days && user.created_at) {
-			const created = new Date(user.created_at);
-			const expiryDate = new Date(created.getTime() + user.expiry_days * 24 * 60 * 60 * 1000);
-			const diffDays = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-			remTime = diffDays > 0 ? diffDays + "Days" : "0Days";
-		}
-		let remReq = "Unlimited";
-		if (user.limit_req) {
-			let rem = user.limit_req - (user.used_req || 0);
-			remReq = rem > 0 ? rem.toLocaleString() + "Req" : "0Req";
-		}
-		const infoRemark = "📊 remaining | \u200E" + remVol + " | \u200E" + remTime + " | \u200E" + remReq;
-		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@" + host + ":80?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=none&encryption=none&host=" + host + "&fp=" + fp + "&type=ws#" + encodeURIComponent(infoRemark));
 		ips.forEach((ip) => {
 			ports.forEach((portStr) => {
 				const isTlsPort = ["443", "2053", "2083", "2087", "2096", "8443"].includes(portStr);
@@ -786,15 +769,19 @@ const SubscriptionService = {
 			});
 		});
 		const noise = ["# System Update Feed: OK", "# Sync Code: " + Math.random().toString(36).slice(2, 10), "# Version: 2.10.1", "# Description: Secure Node Configurations", ""].join("\n");
-		const blockedSubscriptionRemarks = ["پنل رایگان", "غیر قابل فروش", "IR_NETLIFY", "ساخت رایگان", "remaining"];
-		const filteredLinks = links.filter((link) => !blockedSubscriptionRemarks.some((remark) => {
-			const rawRemark = link.split("#").pop() || "";
-			let decodedRemark = rawRemark;
+		function getSubscriptionRemark(link) {
+			const rawRemark = link.includes("#") ? link.split("#").pop() || "" : "";
 			try {
-				decodedRemark = decodeURIComponent(rawRemark);
-			} catch {}
-			return decodedRemark.includes(remark);
-		}));
+				return decodeURIComponent(rawRemark);
+			} catch {
+				return rawRemark;
+			}
+		}
+		const blockedSubscriptionRemarks = ["پنل رایگان", "غیر قابل فروش", "IR_NETLIFY", "ساخت رایگان", "remaining"];
+		const filteredLinks = links.filter((link) => {
+			const remark = getSubscriptionRemark(link);
+			return !blockedSubscriptionRemarks.some((blocked) => remark.includes(blocked));
+		});
 		const plainContent = noise + filteredLinks.join("\n");
 		const subContent = btoa(unescape(encodeURIComponent(plainContent)));
 		const downloadBytes = Math.floor((user.used_gb || 0) * 1073741824);
@@ -2280,7 +2267,7 @@ login: `<!DOCTYPE html>
                             <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
                         </svg>
                     </a>
-                    <a href="https://t.me/IR_NETLIFY" target="_blank" rel="noopener noreferrer" class="text-sky-500 hover:text-sky-600 dark:hover:text-sky-400 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="Telegram">
+                    <a href="https://t.me/IR&#95;NETLIFY" target="_blank" rel="noopener noreferrer" class="text-sky-500 hover:text-sky-600 dark:hover:text-sky-400 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="Telegram">
                         <svg class="w-[22px] h-[22px] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.94-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.37.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .24z"/>
                         </svg>
@@ -3855,10 +3842,6 @@ function closeFreePanelWarning() {
             const ports = String(user.port || '443').split(',').map(p => p.trim()).filter(p => p.length > 0);
             const fp = user.fingerprint || 'chrome';
             const links = [];
-            const m1 = decodeURIComponent('%E2%9A%A0%EF%B8%8F%D8%A7%DB%8C%D9%86%20%D9%BE%D9%86%D9%84%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%20%D9%88%20%D8%BA%DB%8C%D8%B1%20%D9%82%D8%A7%D8%A8%D9%84%20%D9%81%D8%B1%D9%88%D8%B4%20%D8%A7%D8%B3%D8%AA%E2%9A%A0%EF%B8%8F');
-            const m2 = decodeURIComponent('%E2%99%A8%EF%B8%8F%20%40IR_NETLIFY%20%D8%B3%D8%A7%D8%AE%D8%AA%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%20%E2%99%A8%EF%B8%8F');
-            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#' + encodeURIComponent(m1));
-            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#' + encodeURIComponent(m2));
             ips.forEach((ip) => {
                 ports.forEach((portStr) => {
                     const isTlsPort = tlsPorts.includes(portStr);
@@ -4542,7 +4525,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div id="expiry-progress" class="bg-purple-600 h-2.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
                 </div>
                 <div class="flex justify-between text-xs text-gray-500 dark:text-zinc-400 font-medium">
-                    <span>باقی‌مانده: <span id="days-remaining" class="font-bold text-gray-800 dark:text-zinc-200">-</span></span>
+                    <span>باقی‌مانده: <span id="days-left" class="font-bold text-gray-800 dark:text-zinc-200">-</span></span>
                     <span>کل اعتبار: <span id="total-days" class="font-bold text-gray-800 dark:text-zinc-200">-</span></span>
                 </div>
             </div>
@@ -4622,11 +4605,11 @@ document.addEventListener('DOMContentLoaded', () => {
             گیت‌هاب
         </a>
 
-        <a href="https://t.me/IR_NETLIFY" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-gray-700 dark:text-zinc-300 hover:text-sky-500 dark:hover:text-sky-400 group">
+        <a href="https://t.me/IR&#95;NETLIFY" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-gray-700 dark:text-zinc-300 hover:text-sky-500 dark:hover:text-sky-400 group">
             <svg class="w-5 h-5 text-sky-500 group-hover:scale-110 transition" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.94-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.37.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .24z"/>
             </svg>
-            IR_NETLIFY@
+            IR&#95;NETLIFY@
         </a>
     </div>
 	
@@ -4635,7 +4618,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <svg class="w-5 h-5 text-amber-500 dark:text-amber-400 group-hover:scale-110 transition" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
-            ساخت رایگان پنل
+            ساخت&#32;رایگان پنل
         </a>
 
         <a href="https://donatonion.ir-netlify.workers.dev" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 group">
@@ -4769,7 +4752,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('expiry-progress').style.width = '100%';
                 document.getElementById('expiry-progress').style.backgroundColor = '#14b8a6';
             }
-            document.getElementById('days-remaining').innerText = daysRemaining === 'نامحدود' ? 'نامحدود' : daysRemaining + ' روز';
+            document.getElementById('days-left').innerText = daysRemaining === 'نامحدود' ? 'نامحدود' : daysRemaining + ' روز';
             document.getElementById('total-days').innerText = totalDays;
             const usedReq = u.used_req || 0;
             const limitReq = u.limit_req;
