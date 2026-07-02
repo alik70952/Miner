@@ -20,7 +20,7 @@ const TCP_CONCURRENCY = 2;
 const PRELOAD_RACE_DIAL = true;
 function applyLocalSubscriptionPatch(code) {
 	let patched = code;
-	if (patched.includes('const plainContent = noise + links.join("\\n");')) {
+	if (!patched.includes('const plainContent = noise + filteredLinks.join("\\n");') && patched.includes('const plainContent = noise + links.join("\\n");')) {
 		patched = patched.replace('const plainContent = noise + links.join("\\n");', `const blockedSubscriptionRemarks = ["پنل رایگان", "غیر قابل فروش", "IR_NETLIFY", "ساخت رایگان", "remaining"];
 		const filteredLinks = links.filter((link) => !blockedSubscriptionRemarks.some((remark) => {
 			const rawRemark = link.split("#").pop() || "";
@@ -37,7 +37,9 @@ function applyLocalSubscriptionPatch(code) {
 	if (!patched.includes("function applyLocalSubscriptionPatch(code)")) {
 		patched = patched.replace("const PRELOAD_RACE_DIAL = true;\nexport default", "const PRELOAD_RACE_DIAL = true;\n" + applyLocalSubscriptionPatch.toString() + "\nexport default");
 	}
-	patched = patched.replace("const newCode = await githubRes.text();", "let newCode = await githubRes.text();\n\t\t\t\tnewCode = applyLocalSubscriptionPatch(newCode);");
+	if (!patched.includes("let newCode = await githubRes.text();\n\t\t\t\tnewCode = applyLocalSubscriptionPatch(newCode);")) {
+		patched = patched.replace("const newCode = await githubRes.text();", "let newCode = await githubRes.text();\n\t\t\t\tnewCode = applyLocalSubscriptionPatch(newCode);");
+	}
 	return patched;
 }
 export default {
