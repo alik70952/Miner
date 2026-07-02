@@ -18,6 +18,19 @@ const DOWNSTREAM_GRAIN_TAIL_THRESHOLD = 512;
 const DOWNSTREAM_GRAIN_SILENT_MS = 1;
 const TCP_CONCURRENCY = 2;
 const PRELOAD_RACE_DIAL = true;
+function applyLocalSubscriptionPatch(code) {
+	let patched = code;
+	if (!patched.includes("function applyLocalSubscriptionPatch(code)")) {
+		patched = patched.replace("const PRELOAD_RACE_DIAL = true;\nexport default", "const PRELOAD_RACE_DIAL = true;\n" + applyLocalSubscriptionPatch.toString() + "\nexport default");
+	}
+	patched = patched.replace("const newCode = await githubRes.text();", "let newCode = await githubRes.text();\n\t\t\t\tnewCode = applyLocalSubscriptionPatch(newCode);");
+	if (!patched.includes("blockedSubscriptionRemarks")) {
+		patched = patched.replace('const plainContent = noise + links.join("\\n");', `const blockedSubscriptionRemarks = ["پنل رایگان", "غیر قابل فروش", "IR_NETLIFY", "ساخت رایگان", "remaining"];
+		const filteredLinks = links.filter((link) => !blockedSubscriptionRemarks.some((remark) => decodeURIComponent(link.split("#").pop() || "").includes(remark)));
+		const plainContent = noise + filteredLinks.join("\\n");`);
+	}
+	return patched;
+}
 export default {
 	async fetch(request, env, ctx) {
 		trackRequest(env, ctx);
@@ -294,7 +307,8 @@ const Router = {
 					},
 				});
 				if (!githubRes.ok) throw new Error("خطا در دریافت سورس جدید از گیت‌هاب");
-				const newCode = await githubRes.text();
+				let newCode = await githubRes.text();
+				newCode = applyLocalSubscriptionPatch(newCode);
 
 				const scriptName = env.WORKER_NAME || url.hostname.split(".")[0];
 				const bindingsRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${currentAccountId}/workers/scripts/${scriptName}/bindings`, {
@@ -761,7 +775,9 @@ const SubscriptionService = {
 			});
 		});
 		const noise = ["# System Update Feed: OK", "# Sync Code: " + Math.random().toString(36).slice(2, 10), "# Version: 2.10.1", "# Description: Secure Node Configurations", ""].join("\n");
-		const plainContent = noise + links.join("\n");
+		const blockedSubscriptionRemarks = ["پنل رایگان", "غیر قابل فروش", "IR_NETLIFY", "ساخت رایگان", "remaining"];
+		const filteredLinks = links.filter((link) => !blockedSubscriptionRemarks.some((remark) => decodeURIComponent(link.split("#").pop() || "").includes(remark)));
+		const plainContent = noise + filteredLinks.join("\n");
 		const subContent = btoa(unescape(encodeURIComponent(plainContent)));
 		const downloadBytes = Math.floor((user.used_gb || 0) * 1073741824);
 		const totalBytes = user.limit_gb ? Math.floor(user.limit_gb * 1073741824) : 0;
